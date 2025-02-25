@@ -3,37 +3,57 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { addToCart } from "../store/cartSlice";
 import toast from "react-hot-toast";
-const ProductCard = lazy(() => import("Product/ProductCard"));
 
+const ProductCard = lazy(() => import("Product/ProductCard"));
 
 function PrdoctData({ products }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [isInViewMap, setIsInViewMap] = useState({});
+  const [isInViewMap, setIsInViewMap] = useState(() => {
+    return JSON.parse(sessionStorage.getItem("isInViewMap")) || {};
+  });
 
-  // Create a single observer instance
   const observerRef = useRef(null);
-  useEffect(() => {
-    observerRef.current = new IntersectionObserver(
-      (entries, observer) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setIsInViewMap((prev) => ({
-              ...prev,
-              [entry.target.dataset.id]: true,
-            }));
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-    return () => observerRef.current.disconnect();
-  }, []);
 
-  // Callback ref to be used in each ProductCard
+  useEffect(() => {
+    if (!observerRef.current) {
+      observerRef.current = new IntersectionObserver(
+        (entries, observer) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              setIsInViewMap((prev) => {
+                const newMap = { ...prev, [entry.target.dataset.id]: true };
+                sessionStorage.setItem("isInViewMap", JSON.stringify(newMap)); // ✅ Persist state
+                return newMap;
+              });
+              observer.unobserve(entry.target); // ✅ Unobserve once loaded
+            }
+          });
+        },
+        { threshold: 0.1 }
+      );
+    }
+
+    // ✅ Re-observe all elements when component remounts
+    setTimeout(() => {
+      document.querySelectorAll("[data-id]").forEach((node) => {
+        if (node && observerRef.current) {
+          observerRef.current.observe(node);
+        }
+      });
+    }, 500); // 🔥 Small delay ensures DOM is ready
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
+    };
+  }, [products]); // ✅ Run again if products change
+
+  // Callback ref to assign observer dynamically
   const setImageRef = (id) => (node) => {
-    if (node) {
+    if (node && observerRef.current) {
       observerRef.current.observe(node);
     }
   };
@@ -55,7 +75,7 @@ function PrdoctData({ products }) {
             product={item}
             callback={callbackFun}
             addToCartCallBack={addToCartCallBack}
-            imageRef={setImageRef(item.id)}  // Using callback ref here
+            imageRef={setImageRef(item.id)}
             isInView={isInViewMap[item.id] || false}
           />
         ))}

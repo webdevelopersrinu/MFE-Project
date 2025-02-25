@@ -8,8 +8,6 @@ const EcommerceCard = ({
   imageRef,
   isInView,
 }) => {
-  console.log("imageRef:-", imageRef);
-  console.log("isInView:-", isInView);
 
   const handleClick = () => {
     callback(product);
